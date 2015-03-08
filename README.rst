@@ -17,10 +17,8 @@ Scripts
 
 To convert RTTL file to MIDI:
 
-    $ rttlproc midi -i Offspring\ -\ The\ Kids\ Aren\'t\ Alright.txt -o offspring.mid
+    rttlproc midi -i Offspring\ -\ The\ Kids\ Aren\'t\ Alright.txt -o offspring.mid
 
 To dump RTTL information:
 
-    $ rttlproc dump -i Offspring\ -\ The\ Kids\ Aren\'t\ Alright.txt
-    25 BPM
-    B4 C#5 D5 G4 C#5 D5 A4 B4 C#5 D5 E5 D5 C#5 D5 B4 C#5 D5 G4 C#5 D5 A4 B4 C#5 D5 E5 D5 C#5 D5
+    rttlproc dump -i Offspring\ -\ The\ Kids\ Aren\'t\ Alright.txt
