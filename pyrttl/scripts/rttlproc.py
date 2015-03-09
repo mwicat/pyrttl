@@ -1,10 +1,23 @@
 import sys
+import os
+
+from tempfile import NamedTemporaryFile
+
+import logging
+logging.basicConfig()
+logger = logging.getLogger('rttlproc')
+
 import argh
 from argh import arg
 
-from pyrttl.rttl import rttl2score
+from pyrttl.rttl import rttl2score, score2midi
 
-import music21.midi.translate
+try:
+    import mido
+    from mido import MidiFile
+    MIDI_PLAY_SUPPORT = True
+except ImportError:
+    MIDI_PLAY_SUPPORT = False
 
 
 def input2score(input):
@@ -14,12 +27,24 @@ def input2score(input):
     return score
 
 
+
 @arg('-i', '--input', help='rttl input file')
-def play(input=None):
+@arg('-p', '--port', help='midi output port')
+def play(input=None, port='fluidsynth'):
+    if not MIDI_PLAY_SUPPORT:
+        logger.error('Midi player not enabled. Install mido library first')
+        sys.exit(1)
+
     score = input2score(input)
-    notes = list(score.parts[0].notes)
-    print ' '.join(n.nameWithOctave for n in notes)
-    score.show('midi')
+    midif = NamedTemporaryFile('wb', delete=False)
+    score2midi(score, midif.name)
+    midif.close()
+    midi_out = mido.open_output(port)
+
+    for message in MidiFile(midif.name).play():
+        midi_out.send(message)
+    os.remove(midif.name)
+
 
 
 @arg('-i', '--input', help='rttl input file')
@@ -35,10 +60,7 @@ def dump(input=None):
 @arg('-o', '--output', help='midi output file')
 def midi(input=None, output=None):
     score = input2score(input)
-    mf = music21.midi.translate.streamToMidiFile(score)
-    mf.open(output, 'wb')
-    mf.write()
-    mf.close()
+    score2midi(score, output)
 
 
 def main():

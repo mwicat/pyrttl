@@ -75,3 +75,9 @@ def rttl2score(rttl_data):
 
     return score
 
+
+def score2midi(score, filename):
+    mf = m21.midi.translate.streamToMidiFile(score)
+    mf.open(filename, 'wb')
+    mf.write()
+    mf.close()
