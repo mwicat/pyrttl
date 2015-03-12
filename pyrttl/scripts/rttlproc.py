@@ -10,7 +10,9 @@ logger = logging.getLogger('rttlproc')
 import argh
 from argh import arg
 
-from pyrttl.rttl import rttl2score, score2midi
+from pyrttl.rttl import rttl2score, score2midi, get_degree
+
+import music21 as m21
 
 try:
     import mido
@@ -27,6 +29,13 @@ def input2score(input):
     return score
 
 
+def score2midifile(score):
+    midif = NamedTemporaryFile('wb', delete=False)
+    score2midi(score, midif.name)
+    midif.close()
+    mf = MidiFile(midif.name)
+    return mf
+
 
 @arg('-i', '--input', help='rttl input file')
 @arg('-p', '--port', help='midi output port')
@@ -36,14 +45,21 @@ def play(input=None, port='fluidsynth'):
         sys.exit(1)
 
     score = input2score(input)
-    midif = NamedTemporaryFile('wb', delete=False)
-    score2midi(score, midif.name)
-    midif.close()
+    mf = score2midifile(score)
+
     midi_out = mido.open_output(port)
 
-    for message in MidiFile(midif.name).play():
+    key = score.analyze('key')
+    print key
+
+    for message in mf.play():
         midi_out.send(message)
-    os.remove(midif.name)
+        if message.type == 'note_on':
+            midi_pitch = message.note
+            pitch = m21.pitch.Pitch(midi_pitch)
+            degree = get_degree(key, pitch)
+            print pitch, degree
+    os.remove(mf.filename)
 
 
 

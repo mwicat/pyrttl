@@ -2,6 +2,7 @@ from pyparsing import *
 import music21 as m21
 import string
 
+
 name = Word(string.printable.replace(':', ''))
 
 control_name = oneOf('o d b')
@@ -81,3 +82,7 @@ def score2midi(score, filename):
     mf.open(filename, 'wb')
     mf.write()
     mf.close()
+
+
+def get_degree(key, pitch):
+    return key.getScaleDegreeFromPitch(pitch, comparisonAttribute='pitchClass')
