@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from setuptools import setup
 
 
@@ -7,7 +9,10 @@ setup(name='pyrttl',
       author='mwicat',
       author_email='mwicat@gmail.com',
       packages=['pyrttl'],
+      install_requires=['pyparsing',
+                        'argh',
+                        'music21'],
       entry_points={'console_scripts':
-                        ['rttlproc = pyrttl.scripts.rttlproc:main']
+                    ['rttlproc = pyrttl.scripts.rttlproc:main']
                     }
 )
