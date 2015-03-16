@@ -13,66 +13,98 @@ control_section.setParseAction(lambda x: dict(list(x)))
 
 duration = oneOf('1 2 4 8 16 32').setParseAction(lambda x: int(x[0]))
 pitch = oneOf('P C C# D D# E F F# G G# A A# B', caseless=True)
-scale = oneOf('4 5 6 7')
+octave = oneOf('4 5 6 7')
 special_duration = '.'
 
+DEFAULT_OCTAVE = 6
+DEFAULT_DURATION = 4
+DEFAULT_BPM = 63
 
-def parseNote(x):
-    d = 4. / x['duration'] if 'duration' in x else None
-    dots = 1 if x.get('special-duration') else 0
-    if x['pitch'].lower() == 'p':
-        note = m21.note.Rest(quarterLength=d, dots=dots)
-    else:
-        octave = x.get('scale', '')
-        if octave:
-            octave = int(octave) - 1
-        name = '%s%s' % (x['pitch'], octave)
-        note = m21.note.Note(name, quarterLength=d, dots=dots)
-    return note
 
-note = Optional(duration).setResultsName('duration') + \
-             pitch.setResultsName('pitch') + \
-             Optional(scale).setResultsName('scale') + Optional(special_duration).setResultsName('special-duration') + \
-             Suppress(Optional(','))
-note.setParseAction(parseNote)
+def parse_tone(tone):
+    note_dict = {}
+    note_dict['rest'] = (tone['pitch'].lower() == 'p')
+
+    try:
+        note_dict['octave'] = int(tone['octave'])
+    except (KeyError, ValueError):
+        note_dict['octave'] = None
+
+    note_dict['duration'] = tone.get('duration', None)
+    note_dict['pitch'] = tone.get('pitch') if not note_dict['rest'] else None
+    return note_dict
+
+
+note = (
+    Optional(duration).setResultsName('duration') +
+    pitch.setResultsName('pitch') +
+    Each([
+        Optional(octave).setResultsName('octave') + Optional(special_duration).setResultsName('special-duration') +
+        Optional(special_duration).setResultsName('special-duration') + Optional(octave).setResultsName('octave')]) +
+    Suppress(Optional(','))
+)
+note.setParseAction(parse_tone)
 
 tone_commands = Group(OneOrMore(note))
 
-rtx = name + Suppress(':') + control_section + Suppress(':') + tone_commands
-
-s = 'IndianaTheme:d=4,o=5,b=225:e,16f,8g,2c6,d,16e,1f,g,16a,8b,2f6,a,16b,c6,d6,e6,e,16f,8g,1c6,d6,16e6,2f6,g,16g,e6,d6,16g,e6,d6,16g,f6,e6,16d6,2c6'
+rtx = name + Suppress(':') + control_section + Suppress(':') + tone_commands + StringEnd()
 
 
 def parse_rttl(s):
     s = s.strip().replace('_', '#')
     title, control_section, tone_commands = rtx.parseString(s)
     rttl_dict = {'title': title,
-                'control_section': control_section,
-                'tone_commands': tone_commands}
+                 'control_section': control_section,
+                 'tone_commands': tone_commands}
     return rttl_dict
 
 
-def rttl2score(rttl_data, analyze_key=True):
+def rttl2dict(rttl_data):
     rttl_dict = parse_rttl(rttl_data)
     title = rttl_dict['title']
+
     control_section = rttl_dict['control_section']
-    tone_commands = rttl_dict['tone_commands']
+    tempo = control_section.get('b', DEFAULT_BPM)
+
+    notes = rttl_dict['tone_commands']
+
+    for note in notes:
+        if note['octave'] is None:
+            note['octave'] = control_section.get('o', DEFAULT_OCTAVE)
+        if note['duration'] is None:
+            note['duration'] = control_section.get('d', DEFAULT_DURATION)
+
+    result = {'title': title,
+              'tempo': tempo,
+              'notes': list(notes)}
+
+    return result
+
+
+def rttl2score(rttl_data, analyze_key=True):
+    rttl_dict = rttl2dict(rttl_data)
+
+    title = rttl_dict['title']
 
     score = m21.stream.Score()
     score.metadata = m21.metadata.Metadata(title=title, composer='')
 
-    tm = m21.tempo.MetronomeMark(number=control_section['b'])
+    tm = m21.tempo.MetronomeMark(number=rttl_dict['tempo'])
     score.append(tm)
 
     part = m21.stream.Part()
     score.append(part)
 
-    for note in tone_commands:
-        if not note.isRest and note.octave is None:
-            note.octave = control_section['o'] - 1
-        if note.quarterLength is None:
-            note.quarterLength = 4. / control_section['d']
-        part.append(note)
+    def parse_rttl_note(note):
+        quarter_length = 4. / note['duration']
+        if not note['rest']:
+            pitch = '%s%d' % (note['pitch'], note['octave']-1)
+            return m21.note.Note(pitch, quarterLength=quarter_length)
+        else:
+            return m21.note.Rest(quarterLength=quarter_length)
+
+    part.append([
+        parse_rttl_note(n) for n in rttl_dict['notes']])
 
     if analyze_key:
         key = part.analyze('key')
