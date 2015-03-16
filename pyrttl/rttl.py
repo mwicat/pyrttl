@@ -52,7 +52,7 @@ def parse_rttl(s):
     return rttl_dict
 
 
-def rttl2score(rttl_data):
+def rttl2score(rttl_data, analyze_key=True):
     rttl_dict = parse_rttl(rttl_data)
     title = rttl_dict['title']
     control_section = rttl_dict['control_section']
@@ -73,6 +73,10 @@ def rttl2score(rttl_data):
         if note.quarterLength is None:
             note.quarterLength = 4. / control_section['d']
         part.append(note)
+
+    if analyze_key:
+        key = part.analyze('key')
+        part.insert(0, key)
 
     return score
 
